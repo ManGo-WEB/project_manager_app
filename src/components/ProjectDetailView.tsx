@@ -18,6 +18,8 @@ import {
   Check,
   CircleDot,
   ArrowUpCircle,
+  FolderOpen,
+  MonitorUp,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -156,6 +158,14 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
     }
   };
 
+  const handleOpen = async (target: "explorer" | "cursor" | "vscode") => {
+    await fetch(`/api/projects/${slug}/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+  };
+
   const handleToggleSubstage = async (sectionTitle: string, substageIndex: number) => {
     await fetch(`/api/projects/${slug}/toggle-substage`, {
       method: "PATCH",
@@ -213,6 +223,20 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
             >
               <FileText className="w-4 h-4" />
               PRD
+            </button>
+            <button
+              onClick={() => handleOpen("explorer")}
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              title="Открыть в проводнике"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleOpen("cursor")}
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              title="Открыть в Cursor"
+            >
+              <MonitorUp className="w-4 h-4" />
             </button>
             <button
               onClick={handleGitInit}
