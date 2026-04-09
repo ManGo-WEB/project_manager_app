@@ -2,6 +2,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Interactive elements */
+button, a, [role="button"] {
+  cursor: pointer;
+}
+
 /* Smooth theme transition */
 html {
   transition: background-color 0.2s ease, color 0.2s ease;
