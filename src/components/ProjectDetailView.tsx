@@ -21,11 +21,17 @@ import {
   FolderOpen,
   MonitorUp,
   History,
+  StickyNote,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ActivityEntry } from "@/types/project";
 import { ActivityTimeline } from "./ActivityTimeline";
+import type { Note } from "@/types/project";
 import type { ProjectDetail, StageStatus } from "@/types/project";
 import { StatusBadge } from "./StatusBadge";
 import { ProgressBar } from "./ProgressBar";
@@ -53,6 +59,13 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
   const [editingTags, setEditingTags] = useState(false);
   const [editTags, setEditTags] = useState<string[]>([]);
   const [showActivity, setShowActivity] = useState(false);
+  const [showAddNote, setShowAddNote] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteSending, setNoteSending] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [confirmDeleteNoteId, setConfirmDeleteNoteId] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [showRemoteModal, setShowRemoteModal] = useState(false);
   const [remoteUrl, setRemoteUrl] = useState("");
@@ -161,6 +174,47 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
     } finally {
       setRemoteLoading(false);
     }
+  };
+
+  const fetchNotes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${slug}/notes`);
+      const data = await res.json();
+      setNotes(data);
+      setNotesLoaded(true);
+    } catch {
+      setNotes([]);
+    }
+  }, [slug]);
+
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noteText.trim()) return;
+    setNoteSending(true);
+    await fetch(`/api/projects/${slug}/notes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: noteText }),
+    });
+    setNoteText("");
+    setNoteSending(false);
+    setShowAddNote(false);
+    fetchNotes();
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    await fetch(`/api/projects/${slug}/notes`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteId }),
+    });
+    setConfirmDeleteNoteId(null);
+    fetchNotes();
+  };
+
+  const handleToggleNotes = () => {
+    if (!notesLoaded) fetchNotes();
+    setNotesExpanded(!notesExpanded);
   };
 
   const handleOpenActivity = async () => {
@@ -454,6 +508,119 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
           </div>
         )}
       </div>
+
+      {/* Notes section */}
+      <div className="mt-8">
+        <button
+          onClick={handleToggleNotes}
+          className="flex items-center gap-2 text-lg font-semibold mb-4 hover:text-blue-500 transition-colors"
+        >
+          {notesExpanded ? (
+            <ChevronDown className="w-5 h-5" />
+          ) : (
+            <ChevronRight className="w-5 h-5" />
+          )}
+          Заметки
+          {notesLoaded && notes.length > 0 && (
+            <span className="text-sm font-normal text-gray-400 ml-1">({notes.length})</span>
+          )}
+        </button>
+
+        {notesExpanded && (
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+            {notes.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Заметок пока нет</p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                {notes.map((note) => (
+                  <div key={note.id} className="group px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#161630] transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{note.text}</p>
+                      <div className="relative shrink-0">
+                        {confirmDeleteNoteId === note.id ? (
+                          <div className="flex items-center gap-1.5 bg-white dark:bg-[#1c1c36] border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 shadow-sm">
+                            <span className="text-xs text-gray-500 whitespace-nowrap">Удалить?</span>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="text-xs px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+                            >
+                              Да
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteNoteId(null)}
+                              className="text-xs px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              Нет
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteNoteId(note.id)}
+                            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 hover:text-red-500 transition-all"
+                            title="Удалить заметку"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5">
+                      {new Date(note.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}, {new Date(note.date).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* FAB — Add note */}
+      <button
+        onClick={() => setShowAddNote(true)}
+        className="fixed bottom-8 right-8 w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all z-30"
+        title="Добавить заметку"
+      >
+        <StickyNote className="w-5 h-5" />
+      </button>
+
+      {/* Add Note Modal */}
+      <Modal isOpen={showAddNote} onClose={() => setShowAddNote(false)} title="Новая заметка">
+        <form onSubmit={handleAddNote} className="space-y-4">
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="Запишите мысль, идею, ссылку..."
+            rows={4}
+            autoFocus
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#22224a] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                handleAddNote(e);
+              }
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Ctrl+Enter для отправки</span>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddNote(false)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={noteSending || !noteText.trim()}
+                className="px-4 py-2 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {noteSending ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {/* Activity Modal */}
       <Modal isOpen={showActivity} onClose={() => setShowActivity(false)} title={`Активность: ${meta.name}`}>
