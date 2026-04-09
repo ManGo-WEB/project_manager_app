@@ -41,6 +41,13 @@ export interface GitStatus {
   hasRemote: boolean;
 }
 
+export interface ActivityEntry {
+  hash: string;
+  date: string;
+  message: string;
+  author: string;
+}
+
 export interface ProjectSummary {
   slug: string;
   meta: ProjectMeta;

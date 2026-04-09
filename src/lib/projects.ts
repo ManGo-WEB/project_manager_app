@@ -5,7 +5,7 @@ import { PROJECTS_DIR, getProjectDocsPath, getProjectPath } from "./config";
 import { readProjectMeta, readFileContent, readMarkdownWithFrontmatter, findFileInsensitive } from "./markdown";
 import { parsePlan, parseCurrentStages, findCurrentStage, calculateStageProgress } from "./parsers";
 import matter from "gray-matter";
-import type { ProjectSummary, ProjectDetail, GitStatus } from "@/types/project";
+import type { ProjectSummary, ProjectDetail, GitStatus, ActivityEntry } from "@/types/project";
 import { getSettings } from "./settings";
 
 export function getGitStatus(slug: string): GitStatus {
@@ -50,6 +50,36 @@ export function getGitStatus(slug: string): GitStatus {
   }
 
   return { initialized: true, hasUncommitted, unpushedCount, hasRemote };
+}
+
+export function getProjectActivity(slug: string, limit: number = 50): ActivityEntry[] {
+  const projectDir = getProjectPath(slug);
+  const gitDir = path.join(projectDir, ".git");
+
+  if (!fs.existsSync(gitDir)) {
+    return [];
+  }
+
+  try {
+    const log = execSync(
+      `git log --pretty=format:"%H||%aI||%an||%s" -n ${limit}`,
+      { cwd: projectDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    );
+
+    if (!log.trim()) return [];
+
+    return log.trim().split("\n").map((line) => {
+      const [hash, date, author, ...messageParts] = line.split("||");
+      return {
+        hash,
+        date,
+        author,
+        message: messageParts.join("||"),
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export function listProjectSlugs(): string[] {

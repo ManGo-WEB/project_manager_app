@@ -20,9 +20,12 @@ import {
   ArrowUpCircle,
   FolderOpen,
   MonitorUp,
+  History,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { ActivityEntry } from "@/types/project";
+import { ActivityTimeline } from "./ActivityTimeline";
 import type { ProjectDetail, StageStatus } from "@/types/project";
 import { StatusBadge } from "./StatusBadge";
 import { ProgressBar } from "./ProgressBar";
@@ -49,6 +52,8 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
   const [showPrd, setShowPrd] = useState(false);
   const [editingTags, setEditingTags] = useState(false);
   const [editTags, setEditTags] = useState<string[]>([]);
+  const [showActivity, setShowActivity] = useState(false);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [showRemoteModal, setShowRemoteModal] = useState(false);
   const [remoteUrl, setRemoteUrl] = useState("");
   const [remoteLoading, setRemoteLoading] = useState(false);
@@ -158,6 +163,19 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
     }
   };
 
+  const handleOpenActivity = async () => {
+    if (activity.length === 0) {
+      try {
+        const res = await fetch(`/api/projects/${slug}/activity`);
+        const data = await res.json();
+        setActivity(data);
+      } catch {
+        setActivity([]);
+      }
+    }
+    setShowActivity(true);
+  };
+
   const handleOpen = async (target: "explorer" | "cursor" | "vscode") => {
     await fetch(`/api/projects/${slug}/open`, {
       method: "POST",
@@ -223,6 +241,13 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
             >
               <FileText className="w-4 h-4" />
               PRD
+            </button>
+            <button
+              onClick={handleOpenActivity}
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              title="Хронология активности"
+            >
+              <History className="w-4 h-4" />
             </button>
             <button
               onClick={() => handleOpen("explorer")}
@@ -429,6 +454,11 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
           </div>
         )}
       </div>
+
+      {/* Activity Modal */}
+      <Modal isOpen={showActivity} onClose={() => setShowActivity(false)} title={`Активность: ${meta.name}`}>
+        <ActivityTimeline entries={activity} />
+      </Modal>
 
       {/* PRD Modal */}
       <Modal isOpen={showPrd} onClose={() => setShowPrd(false)} title={`PRD: ${meta.name}`}>
