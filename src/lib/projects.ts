@@ -52,6 +52,23 @@ export function getGitStatus(slug: string): GitStatus {
   return { initialized: true, hasUncommitted, unpushedCount, hasRemote };
 }
 
+export function getLastCommitDate(slug: string): string | null {
+  const projectDir = getProjectPath(slug);
+  const gitDir = path.join(projectDir, ".git");
+
+  if (!fs.existsSync(gitDir)) return null;
+
+  try {
+    const date = execSync(
+      'git log -1 --pretty=format:"%aI"',
+      { cwd: projectDir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    ).trim();
+    return date || null;
+  } catch {
+    return null;
+  }
+}
+
 export function getProjectActivity(slug: string, limit: number = 50): ActivityEntry[] {
   const projectDir = getProjectPath(slug);
   const gitDir = path.join(projectDir, ".git");
@@ -158,12 +175,15 @@ export function getProjectSummary(slug: string): ProjectSummary {
 
 export function getAllProjects(): ProjectSummary[] {
   const slugs = listProjectSlugs();
-  const projects = slugs.map(getProjectSummary);
+  const projects = slugs.map((slug) => ({
+    ...getProjectSummary(slug),
+    _lastCommit: getLastCommitDate(slug),
+  }));
 
-  // Sort by last_updated descending (most recent first)
+  // Sort by last commit date descending (most recent first), fallback to last_updated
   return projects.sort((a, b) => {
-    const dateA = a.meta.last_updated || a.meta.created || "";
-    const dateB = b.meta.last_updated || b.meta.created || "";
+    const dateA = a._lastCommit || a.meta.last_updated || a.meta.created || "";
+    const dateB = b._lastCommit || b.meta.last_updated || b.meta.created || "";
     return dateB.localeCompare(dateA);
   });
 }
