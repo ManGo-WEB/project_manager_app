@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FolderOpen, GitBranch, CircleDot, ArrowUpCircle, AlertTriangle, Clock, Calendar } from "lucide-react";
+import { useState } from "react";
+import { FolderOpen, GitBranch, CircleDot, ArrowUpCircle, AlertTriangle, Clock, Calendar, ChevronDown } from "lucide-react";
 import type { ProjectSummary } from "@/types/project";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
@@ -12,6 +13,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const { slug, meta, currentStage, currentStageProgress, overallProgress, git, nearestDeadline, deadlineStatus } = project;
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const formatDeadline = (date: string) => {
     return new Date(date + "T00:00:00").toLocaleDateString("ru-RU", {
@@ -100,20 +102,32 @@ export function ProjectCard({ project }: ProjectCardProps) {
           )}
         </div>
 
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-          <StatusBadge status={meta.status} size="sm" />
-          {meta.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 justify-end">
-              {meta.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            <StatusBadge status={meta.status} size="sm" />
+            {meta.tags.length > 0 && (
+              <div className="flex items-start gap-1.5">
+                <div className={`flex gap-1.5 ${tagsExpanded ? "flex-wrap justify-end" : ""}`}>
+                  {(tagsExpanded ? meta.tags : meta.tags.slice(0, 2)).map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                {meta.tags.length > 2 && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagsExpanded(!tagsExpanded); }}
+                    className="flex items-center justify-center w-5 h-5 shrink-0 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${tagsExpanded ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Link>
