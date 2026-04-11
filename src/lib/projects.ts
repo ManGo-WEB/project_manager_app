@@ -652,3 +652,81 @@ export function setPlanDeadline(slug: string, stageIndex: number, deadline: stri
   // Update last_updated in PRD
   updatePrdFrontmatter(slug, {});
 }
+
+export function generateReport(slug: string): string {
+  const detail = getProjectDetail(slug);
+  if (!detail) throw new Error("Проект не найден");
+
+  const { meta, plan, stages, currentStage, currentStageProgress } = detail;
+
+  const totalStages = plan.length;
+  const completedStages = plan.filter((s) => s.completed).length;
+  const overallProgress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+
+  const now = new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+
+  const lines: string[] = [];
+
+  lines.push(`# Отчёт: ${meta.name}`);
+  lines.push("");
+  lines.push(`**Дата отчёта:** ${now}`);
+  lines.push("");
+
+  lines.push("## Сводка");
+  lines.push("");
+  lines.push(`| Параметр | Значение |`);
+  lines.push(`|---|---|`);
+  lines.push(`| **Статус** | ${meta.status} |`);
+  lines.push(`| **Общий прогресс** | ${overallProgress}% (${completedStages} из ${totalStages} этапов) |`);
+  if (currentStage) {
+    lines.push(`| **Текущий этап** | ${currentStage} (${currentStageProgress}%) |`);
+  }
+  lines.push(`| **Теги** | ${meta.tags.length > 0 ? meta.tags.join(", ") : "—"} |`);
+  lines.push(`| **Создан** | ${meta.created} |`);
+  lines.push(`| **Обновлён** | ${meta.last_updated} |`);
+  lines.push("");
+
+  if (meta.description) {
+    lines.push("## Описание");
+    lines.push("");
+    lines.push(meta.description);
+    lines.push("");
+  }
+
+  lines.push("## План работ");
+  lines.push("");
+  for (const stage of plan) {
+    const check = stage.completed ? "x" : " ";
+    let line = `- [${check}] **${stage.title}** — ${stage.description}`;
+    if (stage.deadline) {
+      line += ` (дедлайн: ${stage.deadline})`;
+    }
+    lines.push(line);
+  }
+  lines.push("");
+
+  if (stages.length > 0) {
+    lines.push("## Детализация этапов");
+    lines.push("");
+    for (const section of stages) {
+      const total = section.substages.length;
+      const done = section.substages.filter((s) => s.completed).length;
+      lines.push(`### ${section.title} — ${section.status} (${done}/${total})`);
+      lines.push("");
+      for (const sub of section.substages) {
+        const check = sub.completed ? "x" : " ";
+        let line = `- [${check}] ${sub.title}`;
+        if (sub.date) {
+          line += ` — ${sub.date}`;
+        }
+        lines.push(line);
+      }
+      lines.push("");
+    }
+  }
+
+  lines.push("---");
+  lines.push(`*Сгенерировано Projects Manager — ${now}*`);
+
+  return lines.join("\n");
+}

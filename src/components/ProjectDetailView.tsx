@@ -30,6 +30,7 @@ import {
   X,
   AlertTriangle,
   Clock,
+  Download,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -76,6 +77,8 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState("");
   const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
+  const [showExport, setShowExport] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<number | null>(null);
   const [deadlineValue, setDeadlineValue] = useState("");
 
@@ -246,6 +249,78 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
     });
   };
 
+  const getReportFilename = (ext: string) => {
+    const date = new Date().toISOString().split("T")[0];
+    return `${slug}-report-${date}.${ext}`;
+  };
+
+  const handleExportMarkdown = async () => {
+    setExportLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${slug}/export?format=md`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = getReportFilename("md");
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Не удалось экспортировать отчёт");
+    } finally {
+      setExportLoading(false);
+      setShowExport(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    setExportLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${slug}/export?format=json`);
+      const data = await res.json();
+      const { marked } = await import("marked");
+      const htmlContent = await marked(data.markdown);
+
+      const container = document.createElement("div");
+      container.innerHTML = htmlContent;
+      container.style.cssText = "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a; line-height: 1.6;";
+
+      const style = document.createElement("style");
+      style.textContent = `
+        h1 { border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+        h2 { color: #374151; margin-top: 32px; }
+        h3 { color: #4b5563; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; }
+        th { background: #f3f4f6; font-weight: 600; }
+        ul { padding-left: 24px; }
+        li { margin: 4px 0; }
+        hr { border: none; border-top: 1px solid #e5e7eb; margin: 32px 0; }
+        em { color: #6b7280; }
+      `;
+      container.prepend(style);
+      document.body.appendChild(container);
+
+      const html2pdf = (await import("html2pdf.js")).default;
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: getReportFilename("pdf"),
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(container)
+        .save();
+
+      document.body.removeChild(container);
+    } catch {
+      alert("Не удалось экспортировать отчёт");
+    } finally {
+      setExportLoading(false);
+      setShowExport(false);
+    }
+  };
+
   const toggleStageExpanded = (index: number) => {
     setExpandedStages((prev) => {
       const next = new Set(prev);
@@ -363,6 +438,13 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
               title="Открыть в Cursor"
             >
               <MonitorUp className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowExport(true)}
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              title="Экспорт отчёта"
+            >
+              <Download className="w-4 h-4" />
             </button>
             <button
               onClick={handleGitInit}
@@ -765,6 +847,33 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
       <Modal isOpen={showPrd} onClose={() => setShowPrd(false)} title={`PRD: ${meta.name}`}>
         <div className="prose prose-sm dark:prose-invert max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{prdContent}</ReactMarkdown>
+        </div>
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal isOpen={showExport} onClose={() => setShowExport(false)} title="Экспорт отчёта">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Выберите формат экспорта сводного отчёта по проекту
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={handleExportMarkdown}
+            disabled={exportLoading}
+            className="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 transition-all disabled:opacity-50"
+          >
+            <FileText className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+            <span className="text-sm font-medium">Markdown</span>
+            <span className="text-[11px] text-gray-400">.md файл</span>
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={exportLoading}
+            className="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 transition-all disabled:opacity-50"
+          >
+            <Download className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+            <span className="text-sm font-medium">PDF</span>
+            <span className="text-[11px] text-gray-400">Печать в PDF</span>
+          </button>
         </div>
       </Modal>
 
