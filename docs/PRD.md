@@ -1,11 +1,16 @@
 ---
-name: "Projects Manager"
-description: "Локальное веб-приложение для учёта и отслеживания состояния проектов с дашбордом, планами и детализацией этапов"
-status: "В работе"
-tags: ["веб", "утилита", "pet-project"]
+name: Projects Manager
+description: >-
+  Локальное веб-приложение для учёта и отслеживания состояния проектов с
+  дашбордом, планами и детализацией этапов
+status: В работе
+tags:
+  - веб
+  - утилита
+  - pet-project
 archived: false
-created: "2026-04-09"
-last_updated: "2026-04-11"
+created: '2026-04-09'
+last_updated: '2026-04-11'
 ---
 
 # PRD: Projects Manager

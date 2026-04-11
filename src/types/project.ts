@@ -19,6 +19,7 @@ export interface PlanStage {
   title: string;
   description: string;
   completed: boolean;
+  deadline?: string;
 }
 
 export interface SubStage {
@@ -59,7 +60,10 @@ export interface ProjectSummary {
   meta: ProjectMeta;
   currentStage: string | null;
   currentStageProgress: number;
+  overallProgress: number;
   git: GitStatus;
+  nearestDeadline?: string;
+  deadlineStatus?: "overdue" | "approaching" | "normal";
 }
 
 export interface ProjectDetail {

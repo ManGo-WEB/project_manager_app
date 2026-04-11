@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FolderOpen, GitBranch, CircleDot, ArrowUpCircle } from "lucide-react";
+import { FolderOpen, GitBranch, CircleDot, ArrowUpCircle, AlertTriangle, Clock, Calendar } from "lucide-react";
 import type { ProjectSummary } from "@/types/project";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
@@ -11,7 +11,14 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const { slug, meta, currentStage, currentStageProgress, git } = project;
+  const { slug, meta, currentStage, currentStageProgress, overallProgress, git, nearestDeadline, deadlineStatus } = project;
+
+  const formatDeadline = (date: string) => {
+    return new Date(date + "T00:00:00").toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+    });
+  };
 
   return (
     <Link href={`/project/${slug}`}>
@@ -50,15 +57,48 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </p>
         )}
 
-        {currentStage && (
-          <div className="mb-3">
-            <div className="flex items-center justify-between text-sm mb-1.5">
-              <span className="text-gray-600 dark:text-gray-400 truncate">{currentStage}</span>
-              <span className="font-medium text-gray-700 dark:text-gray-300 ml-2 shrink-0">{currentStageProgress}%</span>
+        {/* Progress section */}
+        <div className="mb-3 space-y-2.5">
+          {/* Overall progress */}
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-gray-500 dark:text-gray-400">Общий прогресс</span>
+              <span className="font-medium text-gray-600 dark:text-gray-300">{overallProgress}%</span>
             </div>
-            <ProgressBar progress={currentStageProgress} />
+            <ProgressBar progress={overallProgress} size="sm" />
           </div>
-        )}
+
+          {/* Current stage progress */}
+          {currentStage && (
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-gray-600 dark:text-gray-400 truncate">{currentStage}</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300 ml-2 shrink-0">{currentStageProgress}%</span>
+              </div>
+              <ProgressBar progress={currentStageProgress} size="sm" />
+            </div>
+          )}
+
+          {/* Nearest deadline */}
+          {nearestDeadline && deadlineStatus && (
+            <div className={`flex items-center gap-1.5 text-xs ${
+              deadlineStatus === "overdue"
+                ? "text-red-600 dark:text-red-400"
+                : deadlineStatus === "approaching"
+                  ? "text-yellow-600 dark:text-yellow-400"
+                  : "text-gray-500 dark:text-gray-400"
+            }`}>
+              {deadlineStatus === "overdue" ? (
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              ) : deadlineStatus === "approaching" ? (
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+              ) : (
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span>Дедлайн: {formatDeadline(nearestDeadline)}</span>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
           <StatusBadge status={meta.status} size="sm" />

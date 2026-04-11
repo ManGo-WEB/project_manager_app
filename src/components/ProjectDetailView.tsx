@@ -26,6 +26,10 @@ import {
   ChevronRight,
   Plus,
   Trash2,
+  Calendar,
+  X,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -72,6 +76,8 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState("");
   const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
+  const [editingDeadline, setEditingDeadline] = useState<number | null>(null);
+  const [deadlineValue, setDeadlineValue] = useState("");
 
   const fetchProject = useCallback(() => {
     fetch(`/api/projects/${slug}`)
@@ -249,6 +255,33 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
         next.add(index);
       }
       return next;
+    });
+  };
+
+  const handleSetDeadline = async (stageIndex: number, deadline: string | null) => {
+    await fetch(`/api/projects/${slug}/deadline`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stageIndex, deadline }),
+    });
+    setEditingDeadline(null);
+    setDeadlineValue("");
+    fetchProject();
+  };
+
+  const getDeadlineInfo = (deadline: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadlineDate = new Date(deadline + "T00:00:00");
+    const daysUntil = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return { daysUntil, deadlineDate };
+  };
+
+  const formatDeadline = (deadline: string) => {
+    return new Date(deadline + "T00:00:00").toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   };
 
@@ -460,30 +493,94 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-4">План работ</h2>
         <div className="space-y-2">
-          {plan.map((stage, i) => (
-            <div
-              key={i}
-              className={`flex items-start gap-3 p-3 rounded-lg ${
-                stage.title === currentStage
-                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                  : "bg-gray-50 dark:bg-[#161630]"
-              }`}
-            >
-              {stage.completed ? (
-                <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
-              ) : stage.title === currentStage ? (
-                <Loader2 className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-              ) : (
-                <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600 mt-0.5 shrink-0" />
-              )}
-              <div>
-                <p className={`font-medium text-sm ${stage.completed ? "text-gray-500 dark:text-gray-400 line-through" : ""}`}>
-                  {stage.title}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">{stage.description}</p>
+          {plan.map((stage, i) => {
+            const deadlineInfo = stage.deadline ? getDeadlineInfo(stage.deadline) : null;
+            const isOverdue = deadlineInfo && !stage.completed && deadlineInfo.daysUntil < 0;
+            const isApproaching = deadlineInfo && !stage.completed && deadlineInfo.daysUntil >= 0 && deadlineInfo.daysUntil <= 7;
+
+            return (
+              <div
+                key={i}
+                className={`group/plan flex items-start gap-3 p-3 rounded-lg ${
+                  stage.title === currentStage
+                    ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                    : "bg-gray-50 dark:bg-[#161630]"
+                }`}
+              >
+                {stage.completed ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
+                ) : stage.title === currentStage ? (
+                  <Loader2 className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600 mt-0.5 shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium text-sm ${stage.completed ? "text-gray-500 dark:text-gray-400 line-through" : ""}`}>
+                    {stage.title}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">{stage.description}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                  {editingDeadline === i ? (
+                    <input
+                      type="date"
+                      value={deadlineValue}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleSetDeadline(i, e.target.value);
+                        }
+                      }}
+                      onBlur={() => { setEditingDeadline(null); setDeadlineValue(""); }}
+                      className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#22224a] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      autoFocus
+                    />
+                  ) : stage.deadline ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => !stage.completed && (() => { setEditingDeadline(i); setDeadlineValue(stage.deadline!); })()}
+                        className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-md transition-colors ${
+                          isOverdue
+                            ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                            : isApproaching
+                              ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400"
+                              : stage.completed
+                                ? "bg-gray-100 dark:bg-gray-700/50 text-gray-400"
+                                : "bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600/50"
+                        }`}
+                        title={stage.completed ? "" : "Изменить дедлайн"}
+                      >
+                        {isOverdue ? (
+                          <AlertTriangle className="w-3 h-3" />
+                        ) : isApproaching ? (
+                          <Clock className="w-3 h-3" />
+                        ) : (
+                          <Calendar className="w-3 h-3" />
+                        )}
+                        {formatDeadline(stage.deadline)}
+                      </button>
+                      {!stage.completed && (
+                        <button
+                          onClick={() => handleSetDeadline(i, null)}
+                          className="p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 hover:text-red-500 transition-colors"
+                          title="Убрать дедлайн"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ) : !stage.completed ? (
+                    <button
+                      onClick={() => { setEditingDeadline(i); setDeadlineValue(""); }}
+                      className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      title="Установить дедлайн"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

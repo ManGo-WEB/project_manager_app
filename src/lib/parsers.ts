@@ -5,7 +5,7 @@ import type {
   StageStatus,
 } from "@/types/project";
 
-const CHECKBOX_REGEX = /^-\s+\[(x| )\]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.+)$/;
+export const CHECKBOX_REGEX = /^-\s+\[(x| )\]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.+)$/;
 const SUBSTAGE_REGEX = /^-\s+\[(x| )\]\s+(.+)$/;
 const STATUS_KEYWORDS: Record<string, StageStatus> = {
   "запланирован": "Запланирован",
@@ -23,10 +23,20 @@ export function parsePlan(content: string): PlanStage[] {
   for (const line of content.split("\n")) {
     const match = line.trim().match(CHECKBOX_REGEX);
     if (match) {
+      let description = match[3].trim();
+      let deadline: string | undefined;
+
+      const deadlineMatch = description.match(/\s*deadline:(\d{4}-\d{2}-\d{2})\s*$/);
+      if (deadlineMatch) {
+        deadline = deadlineMatch[1];
+        description = description.replace(/\s*deadline:\d{4}-\d{2}-\d{2}\s*$/, "").trim();
+      }
+
       stages.push({
         title: match[2].trim(),
-        description: match[3].trim(),
+        description,
         completed: match[1] === "x",
+        deadline,
       });
     }
   }

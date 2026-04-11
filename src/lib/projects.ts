@@ -3,7 +3,7 @@ import path from "path";
 import { execSync } from "child_process";
 import { PROJECTS_DIR, getProjectDocsPath, getProjectPath } from "./config";
 import { readProjectMeta, readFileContent, readMarkdownWithFrontmatter, findFileInsensitive } from "./markdown";
-import { parsePlan, parseCurrentStages, findCurrentStage, calculateStageProgress } from "./parsers";
+import { parsePlan, parseCurrentStages, findCurrentStage, calculateStageProgress, CHECKBOX_REGEX } from "./parsers";
 import matter from "gray-matter";
 import type { ProjectSummary, ProjectDetail, GitStatus, ActivityEntry } from "@/types/project";
 import { getSettings } from "./settings";
@@ -111,6 +111,36 @@ export function getProjectSummary(slug: string): ProjectSummary {
 
   const git = getGitStatus(slug);
 
+  // Compute nearest deadline from incomplete stages
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let nearestDeadline: string | undefined;
+  let deadlineStatus: "overdue" | "approaching" | "normal" | undefined;
+
+  const incompleteDeadlines = plan
+    .filter((s) => !s.completed && s.deadline)
+    .map((s) => s.deadline!)
+    .sort();
+
+  if (incompleteDeadlines.length > 0) {
+    nearestDeadline = incompleteDeadlines[0];
+    const deadlineDate = new Date(nearestDeadline + "T00:00:00");
+    const daysUntil = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntil < 0) {
+      deadlineStatus = "overdue";
+    } else if (daysUntil <= 7) {
+      deadlineStatus = "approaching";
+    } else {
+      deadlineStatus = "normal";
+    }
+  }
+
+  // Compute overall progress: completed stages / total stages
+  const totalStages = plan.length;
+  const completedStages = plan.filter((s) => s.completed).length;
+  const overallProgress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+
   return {
     slug,
     meta: {
@@ -119,7 +149,10 @@ export function getProjectSummary(slug: string): ProjectSummary {
     },
     currentStage,
     currentStageProgress,
+    overallProgress,
     git,
+    nearestDeadline,
+    deadlineStatus,
   };
 }
 
@@ -562,6 +595,59 @@ export function toggleSubstage(slug: string, sectionTitle: string, substageIndex
   }
 
   fs.writeFileSync(stagesPath, lines.join("\n"), "utf-8");
+
+  // Update last_updated in PRD
+  updatePrdFrontmatter(slug, {});
+}
+
+export function setPlanDeadline(slug: string, stageIndex: number, deadline: string | null): void {
+  const docsPath = getProjectDocsPath(slug);
+  const planPath = findFileInsensitive(docsPath, "PLAN.md");
+
+  if (!fs.existsSync(planPath)) {
+    throw new Error("PLAN.md не найден");
+  }
+
+  const content = fs.readFileSync(planPath, "utf-8");
+  const lines = content.split("\n");
+
+  let stageCount = -1;
+  let targetLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (CHECKBOX_REGEX.test(lines[i].trim())) {
+      stageCount++;
+      if (stageCount === stageIndex) {
+        targetLine = i;
+        break;
+      }
+    }
+  }
+
+  if (targetLine === -1) {
+    throw new Error("Этап не найден");
+  }
+
+  let line = lines[targetLine];
+  const endsWithCR = line.endsWith("\r");
+  if (endsWithCR) {
+    line = line.slice(0, -1);
+  }
+
+  // Remove existing deadline if present
+  line = line.replace(/\s*deadline:\d{4}-\d{2}-\d{2}/, "");
+
+  // Add new deadline if provided
+  if (deadline) {
+    line = line + ` deadline:${deadline}`;
+  }
+
+  if (endsWithCR) {
+    line = line + "\r";
+  }
+
+  lines[targetLine] = line;
+  fs.writeFileSync(planPath, lines.join("\n"), "utf-8");
 
   // Update last_updated in PRD
   updatePrdFrontmatter(slug, {});
