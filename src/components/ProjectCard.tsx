@@ -103,7 +103,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
 
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <StatusBadge status={meta.status} size="sm" />
             {meta.tags.length > 0 && (
               <div className="flex items-start gap-1.5">
