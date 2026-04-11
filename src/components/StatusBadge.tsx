@@ -63,7 +63,7 @@ export function StatusBadge({ status, size = "md", editable = false, onStatusCha
 
   if (!editable) {
     return (
-      <span className={`inline-flex items-center gap-1.5 ${textSize} text-gray-500 dark:text-gray-400`}>
+      <span className={`inline-flex items-center gap-1.5 ${textSize} text-gray-500 dark:text-gray-400 whitespace-nowrap`}>
         <StatusDot status={status} />
         {status}
       </span>
@@ -74,7 +74,7 @@ export function StatusBadge({ status, size = "md", editable = false, onStatusCha
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 ${textSize} text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-gray-100 dark:hover:bg-gray-800`}
+        className={`inline-flex items-center gap-1.5 ${textSize} text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap`}
       >
         <StatusDot status={status} />
         {status}

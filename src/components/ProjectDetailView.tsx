@@ -71,6 +71,7 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
   const [remoteUrl, setRemoteUrl] = useState("");
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState("");
+  const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
 
   const fetchProject = useCallback(() => {
     fetch(`/api/projects/${slug}`)
@@ -80,9 +81,21 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  const fetchNotes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${slug}/notes`);
+      const data = await res.json();
+      setNotes(data);
+      setNotesLoaded(true);
+    } catch {
+      setNotes([]);
+    }
+  }, [slug]);
+
   useEffect(() => {
     fetchProject();
-  }, [fetchProject]);
+    fetchNotes();
+  }, [fetchProject, fetchNotes]);
 
   const handleOpenPrd = async () => {
     if (!prdContent) {
@@ -176,17 +189,6 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
     }
   };
 
-  const fetchNotes = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/projects/${slug}/notes`);
-      const data = await res.json();
-      setNotes(data);
-      setNotesLoaded(true);
-    } catch {
-      setNotes([]);
-    }
-  }, [slug]);
-
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!noteText.trim()) return;
@@ -235,6 +237,18 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ target }),
+    });
+  };
+
+  const toggleStageExpanded = (index: number) => {
+    setExpandedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
     });
   };
 
@@ -480,31 +494,54 @@ export function ProjectDetailView({ slug }: ProjectDetailViewProps) {
           <p className="text-sm text-gray-400">Этапы не определены в CURRENT_STAGES.md</p>
         ) : (
           <div className="space-y-6">
-            {stages.map((section, i) => (
-              <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-[#161630]">
-                  <h3 className="font-medium text-sm">{section.title}</h3>
-                  <StatusBadge status={section.status} />
-                </div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {section.substages.map((sub, j) => (
-                    <button
-                      key={j}
-                      onClick={() => handleToggleSubstage(section.title, j)}
-                      className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-gray-50 dark:hover:bg-[#161630] transition-colors"
-                    >
-                      {STATUS_ICONS[sub.status]}
-                      <span className={`flex-1 text-sm ${sub.completed ? "text-gray-400 line-through" : ""}`}>
-                        {sub.title}
-                      </span>
-                      {sub.date && (
-                        <span className="text-xs text-gray-400">{sub.date}</span>
+            {stages.map((section, i) => {
+              const isCompleted = section.status === "Завершён";
+              const isExpanded = expandedStages.has(i);
+              const showSubstages = !isCompleted || isExpanded;
+
+              return (
+                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div
+                    className={`flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-[#161630] ${isCompleted ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1a1a3a] transition-colors" : ""}`}
+                    onClick={() => isCompleted && toggleStageExpanded(i)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isCompleted && (
+                        isExpanded
+                          ? <ChevronDown className="w-4 h-4 text-gray-400" />
+                          : <ChevronRight className="w-4 h-4 text-gray-400" />
                       )}
-                    </button>
-                  ))}
+                      <h3 className="font-medium text-sm">{section.title}</h3>
+                      {isCompleted && !isExpanded && (
+                        <span className="text-xs text-gray-400 ml-1">
+                          ({section.substages.length})
+                        </span>
+                      )}
+                    </div>
+                    <StatusBadge status={section.status} />
+                  </div>
+                  {showSubstages && (
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {section.substages.map((sub, j) => (
+                        <button
+                          key={j}
+                          onClick={() => handleToggleSubstage(section.title, j)}
+                          className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-gray-50 dark:hover:bg-[#161630] transition-colors"
+                        >
+                          {STATUS_ICONS[sub.status]}
+                          <span className={`flex-1 text-sm ${sub.completed ? "text-gray-400 line-through" : ""}`}>
+                            {sub.title}
+                          </span>
+                          {sub.date && (
+                            <span className="text-xs text-gray-400">{sub.date}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
